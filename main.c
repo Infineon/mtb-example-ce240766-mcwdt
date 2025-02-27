@@ -7,7 +7,7 @@
 * Related Document: See README.md
 *
 *******************************************************************************
-* Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2024-2025, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -41,6 +41,7 @@
 #include "cy_pdl.h"
 #include "cybsp.h"
 #include "cy_retarget_io.h"
+#include "mtb_hal.h"
 
 
 
@@ -53,6 +54,10 @@ cy_stc_sysint_t mcwdt_irq_cfg =
     .intrSrc = ((NvicMux3_IRQn << 16) | srss_interrupt_mcwdt_0_IRQn),
     .intrPriority = 2UL
 };
+
+/* For the Retarget -IO (Debug UART) usage */
+static cy_stc_scb_uart_context_t    UART_context;          /** UART context */
+static mtb_hal_uart_t               UART_hal_obj;          /** Debug UART HAL object */
 
 /*******************************************************************************
 * Function Prototypes
@@ -92,10 +97,33 @@ int main(void)
     /* Enable global interrupts */
     __enable_irq();
 
-    /* Initialize retarget-io to use the debug UART port */
-    Cy_SCB_UART_Init(UART_HW, &UART_config, NULL);
+    /* Debug UART init */
+    result = (cy_rslt_t)Cy_SCB_UART_Init(UART_HW, &UART_config, &UART_context);
+
+    /* UART init failed. Stop program execution */
+    if (result != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
+
     Cy_SCB_UART_Enable(UART_HW);
-    cy_retarget_io_init(UART_HW);
+
+    /* Setup the HAL UART */
+    result = mtb_hal_uart_setup(&UART_hal_obj, &UART_hal_config, &UART_context, NULL);
+
+    /* HAL UART init failed. Stop program execution */
+    if (result != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
+
+    result = cy_retarget_io_init(&UART_hal_obj);
+
+    /* HAL retarget_io init failed. Stop program execution */
+    if (result != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
 
     /* Initialize the User LED1 */
     result = Cy_GPIO_Pin_Init(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN, &CYBSP_USER_LED1_config);
